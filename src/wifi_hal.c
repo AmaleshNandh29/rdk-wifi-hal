@@ -395,10 +395,11 @@ INT wifi_hal_init()
         interface = hash_map_get_first(radio->interface_map);
 
         while (interface != NULL) {
-            update_hostap_data(interface);
-            update_hostap_iface(interface);
-            update_hostap_iface_flags(interface);
-            init_hostap_hw_features(interface);
+            if (update_hostap_data(interface) == RETURN_OK) {
+                update_hostap_iface(interface);
+                update_hostap_iface_flags(interface);
+                init_hostap_hw_features(interface);
+            }
             interface = hash_map_get_next(radio->interface_map, interface);
         }
     }
@@ -1369,7 +1370,6 @@ INT wifi_hal_createVAP(wifi_radio_index_t index, wifi_vap_info_map_t *map)
                             "params\n", __func__, __LINE__, interface->name);
                         return RETURN_ERR;
                     }
-
                     if (vap->u.bss_info.enabled && radio->configured && radio->oper_param.enable) {
                         wifi_hal_info_print("%s:%d: interface:%s enable ap\n", __func__,
                             __LINE__, interface->name);
