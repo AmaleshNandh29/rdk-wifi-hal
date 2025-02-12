@@ -8274,7 +8274,8 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
     memset(interface->wpa_s.current_ssid->ssid, 0, (strlen(backhaul->ssid) + 1));
     strcpy(interface->wpa_s.current_ssid->ssid, backhaul->ssid);
     if ((security->mode != wifi_security_mode_wpa2_personal) &&
-            (security->mode != wifi_security_mode_wpa3_transition)) {
+            (security->mode != wifi_security_mode_wpa3_transition) &&
+            (security->mode != wifi_security_mode_wpa3_compatibility)) {
         interface->wpa_s.current_ssid->ssid_len = strlen(backhaul->ssid);
     }
     interface->wpa_s.current_bss->freq = backhaul->freq;
@@ -8384,6 +8385,12 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
                     break;
                 case wifi_security_mode_wpa3_transition:
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_PSK | WPA_KEY_MGMT_SAE;
+                    break;
+                case wifi_security_mode_wpa3_compatibility:
+                    wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_PSK;
+#if HOSTAPD_VERSION == 210
+                    wpa_conf.wpa_key_mgmt_rsno = WPA_KEY_MGMT_SAE;
+#endif
                     break;
                 default:
                     wifi_hal_info_print("%s:%d:Invalid security mode: %d in wifi_hal_connect\r\n", __func__, __LINE__, security->mode);
@@ -14045,7 +14052,8 @@ int wifi_supplicant_drv_authenticate(void *priv, struct wpa_driver_auth_params *
     nla_put_u32(msg, NL80211_ATTR_WIPHY_FREQ, params->freq);
 
     if ((security->mode == wifi_security_mode_wpa3_personal) ||
-        (security->mode == wifi_security_mode_wpa3_transition)) {
+        (security->mode == wifi_security_mode_wpa3_transition) ||
+        (security->mode == wifi_security_mode_wpa3_compatibility)) {
         nla_put(msg, NL80211_ATTR_SAE_DATA, params->auth_data_len, params->auth_data);
         nla_put_u32(msg, NL80211_ATTR_AUTH_TYPE, NL80211_AUTHTYPE_SAE);
     } else {
@@ -16033,6 +16041,56 @@ INT wifi_hal_getRadioTransmitPower(INT radioIndex, ULONG *tx_power)
     return RETURN_OK;
 }
 
+int wifi_drv_get_sta_auth_type(void *priv, const u8 *addr, int auth_key,int frame_type)
+{
+    wifi_interface_info_t *interface;
+    wifi_vap_info_t *vap;
+    mac_address_t sta;
+    mac_addr_str_t  sta_mac_str;
+    wifi_device_callbacks_t *callbacks;
+    int band;
+    int key_mgmt;
+    if(!addr || !priv) {
+        wifi_hal_error_print("%s:%d station/ies info is null\n", __func__, __LINE__);
+        return RETURN_ERR;
+    }
+    if (auth_key == WPA_KEY_MGMT_PSK) {
+        key_mgmt = 2;
+    }
+    else if (auth_key == WPA_KEY_MGMT_SAE) {
+        key_mgmt = 8;
+    }
+    else if (auth_key == 67108864) {
+        key_mgmt = 24;
+    }
+    else {
+        key_mgmt = -1;
+    }
+    interface = (wifi_interface_info_t *)priv;
+
+    if(interface == NULL) {
+        wifi_hal_error_print("%s:%d interface is null\n", __func__, __LINE__);
+        return RETURN_ERR;
+    }
+
+    vap = &interface->vap_info;
+    memcpy(sta, addr, sizeof(mac_address_t));
+    band = vap->radio_index;
+    callbacks = get_hal_device_callbacks();
+
+    if (callbacks == NULL) {
+        return -1;
+    }
+
+    for (int i = 0; i < callbacks->num_stamode_cbs; i++) {
+        if (callbacks->stamode_cb[i] != NULL) {
+            callbacks->stamode_cb[i](vap->vap_index, to_mac_str(sta, sta_mac_str),key_mgmt,frame_type,band);
+        }
+    }
+
+    return RETURN_OK;
+}
+
 const struct wpa_driver_ops g_wpa_driver_nl80211_ops = {
     .name = "nl80211",
     .desc = "Linux nl80211/cfg80211",
@@ -16194,6 +16252,9 @@ const struct wpa_driver_ops g_wpa_driver_nl80211_ops = {
 #endif // CONFIG_VENDOR_COMMANDS
 #ifdef CMXB7_PORT
     .set_chan_dfs_state = nl80211_set_channel_dfs_state,
+#endif
+#if HOSTAPD_VERSION == 210
+    .get_sta_auth_type = wifi_drv_get_sta_auth_type,
 #endif
 #if HOSTAPD_VERSION >= 210 // 2.10
     .get_rnr_colocation_len = wifi_drv_get_rnr_colocation_len,
@@ -16358,6 +16419,9 @@ const struct wpa_driver_ops g_wpa_supplicant_driver_nl80211_ops = {
     .radius_fallback_failover = wifi_drv_send_radius_fallback_and_failover,
 #ifdef CMXB7_PORT
     .set_chan_dfs_state = nl80211_set_channel_dfs_state,
+#endif
+#if HOSTAPD_VERSION == 210
+    .get_sta_auth_type = wifi_drv_get_sta_auth_type,
 #endif
 };
 #endif //CONFIG_WIFI_EMULATOR

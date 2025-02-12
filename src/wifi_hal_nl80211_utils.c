@@ -1785,6 +1785,8 @@ int get_security_mode_int_from_str(char *security_mode_str,char *mfp_str,wifi_se
         *security_mode = wifi_security_mode_wpa3_enterprise;
     } else if (strcmp(security_mode_str, "wpa wpa2") == 0) {
         *security_mode = wifi_security_mode_wpa_wpa2_enterprise;
+    } else if (strstr(security_mode_str, "psk2") && strstr(security_mode_str, "sae") && !strcmp(mfp_str, "0")) {
+        *security_mode = wifi_security_mode_wpa3_compatibility;
     } else {
         wifi_hal_error_print("%s:%d: wifi security mode not found:[%s:%s]\r\n",__func__, __LINE__, security_mode_str,mfp_str);
         return RETURN_ERR;
@@ -1875,6 +1877,26 @@ int get_security_mode_str_from_int(wifi_security_modes_t security_mode, unsigned
         strcpy(security_mode_str, "wpa wpa2");
         break;
 
+    case wifi_security_mode_wpa3_compatibility:
+#ifdef CONFIG_IEEE80211BE
+        {
+            const wifi_interface_info_t * const interface = get_interface_by_vap_index(vap_index);
+            if (NULL == interface) {
+                wifi_hal_error_print("%s:%d NULL pointer!\n", __FUNCTION__, __LINE__);
+                return RETURN_ERR;
+            }
+            if (wifi_vap_mode_ap == interface->vap_info.vap_mode &&
+                !interface->u.ap.conf.disable_11be) {
+                strcpy(security_mode_str, "sae sae-ext psk2");
+            } else {
+                strcpy(security_mode_str, "psk2 sae");
+            }
+        }
+#else
+        strcpy(security_mode_str, "psk2 sae");
+#endif
+        break;
+
     default:
         wifi_hal_error_print("%s:%d: wifi security mode not found:[%d]\r\n",__func__, __LINE__, security_mode);
         return RETURN_ERR;
@@ -1907,6 +1929,7 @@ int get_security_encryption_mode_str_from_int(wifi_encryption_method_t encryptio
                 case wifi_security_mode_wpa3_personal:
                 case wifi_security_mode_wpa3_transition:
                 case wifi_security_mode_wpa3_enterprise:
+                case wifi_security_mode_wpa3_compatibility:
                     has_gcmp256 = !interface->u.ap.conf.disable_11be;
                     break;
                 default:
