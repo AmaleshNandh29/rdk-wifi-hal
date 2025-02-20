@@ -16061,7 +16061,7 @@ int wifi_drv_get_sta_auth_type(void *priv, const u8 *addr, int auth_key,int fram
     else if (auth_key == WPA_KEY_MGMT_SAE) {
         key_mgmt = 8;
     }
-    else if (auth_key == 67108864) {
+    else if (auth_key == WPA_KEY_MGMT_SAE_EXT_KEY) {
         key_mgmt = 24;
     }
     else {
