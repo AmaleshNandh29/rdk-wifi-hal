@@ -394,6 +394,12 @@ int update_hostap_data(wifi_interface_info_t *interface)
 
     vap = &interface->vap_info;
 
+    if (vap->vap_mode != wifi_vap_mode_ap || is_wifi_hal_vap_mesh_sta(vap->vap_index)) {
+        wifi_hal_error_print("%s:%d: Not an AP based VAP. Returning error\n", __func__,
+            __LINE__);
+        return RETURN_ERR;
+    }
+
     radio = get_radio_by_rdk_index(vap->radio_index);
     iconf = &radio->iconf;
 
@@ -739,13 +745,6 @@ int update_security_config(wifi_vap_security_t *sec, struct hostapd_bss_config *
         }
 
         char output[256] = {0};
-        _syscmd("sh /usr/sbin/deviceinfo.sh -eip", output, sizeof(output));
-
-        //own_ip_addr
-        if (inet_aton(output, &conf->own_ip_addr.u.v4)) {
-            conf->own_ip_addr.af = AF_INET;
-        }
-
         // nas_identifier
         memset(output, '\0', sizeof(output));
         _syscmd("sh /usr/sbin/deviceinfo.sh -emac", output, sizeof(output));
@@ -1408,6 +1407,11 @@ int update_hostap_iface(wifi_interface_info_t *interface)
 #ifdef CONFIG_IEEE80211AX
     struct he_capabilities *drv_he_cap;
 #endif
+#ifdef CONFIG_IEEE80211BE
+#if HOSTAPD_VERSION >= 211
+    struct eht_capabilities *drv_eht_cap;
+#endif // HOSTAPD_VERSION >= 211
+#endif // CONFIG_IEEE80211BE
 
     if (interface == NULL) {
         return RETURN_ERR;
@@ -1471,7 +1475,7 @@ int update_hostap_iface(wifi_interface_info_t *interface)
     iface->basic_rates = radio->basic_rates[band];
 
     get_coutry_str_from_code(param->countryCode, country);
-    iface->freq = ieee80211_chan_to_freq(country, param->op_class, param->channel);
+    iface->freq = ieee80211_chan_to_freq(country, param->operatingClass, param->channel);
 
 #if defined(CONFIG_HW_CAPABILITIES)
     iface->current_mode = get_hw_mode(iface);
@@ -1615,9 +1619,9 @@ int update_hostap_iface(wifi_interface_info_t *interface)
 
     hostapd_set_oper_centr_freq_seg0_idx(interface->u.ap.hapd.iconf, seg0);
 
-    global_op_class = (unsigned int) country_to_global_op_class(country, (unsigned char)param->op_class);
+    global_op_class = (unsigned int) country_to_global_op_class(country, (unsigned char)param->operatingClass);
     wifi_hal_info_print("%s:%d:interface name:%s country:%s op class:%d global op class:%d channel:%d frequency:%d center_freq1:%d\n", __func__, __LINE__, 
-        interface->name, country, param->op_class, global_op_class, param->channel, iface->freq, cf1);
+        interface->name, country, param->operatingClass, global_op_class, param->channel, iface->freq, cf1);
     if (interface->u.ap.iface_initialized == false) {
         dl_list_init(&iface->sta_seen);
         interface->u.ap.iface_initialized = true;
@@ -1709,6 +1713,18 @@ int update_hostap_iface(wifi_interface_info_t *interface)
 #endif
 #endif
 
+#ifdef CONFIG_IEEE80211BE
+#if HOSTAPD_VERSION >= 211
+    drv_eht_cap = &iface->current_mode->eht_capab[IEEE80211_MODE_AP];
+    iface->conf->eht_phy_capab.su_beamformer = !!(
+        drv_eht_cap->phy_cap[EHT_PHYCAP_SU_BEAMFORMER_IDX] & EHT_PHYCAP_SU_BEAMFORMER);
+    iface->conf->eht_phy_capab.su_beamformee = !!(
+        drv_eht_cap->phy_cap[EHT_PHYCAP_SU_BEAMFORMEE_IDX] & EHT_PHYCAP_SU_BEAMFORMEE);
+    iface->conf->eht_phy_capab.mu_beamformer = !!(
+        drv_eht_cap->phy_cap[EHT_PHYCAP_MU_BEAMFORMER_IDX] & EHT_PHYCAP_MU_BEAMFORMER_MASK);
+#endif // HOSTAPD_VERSION >= 211
+#endif // CONFIG_IEEE80211BE
+
     if(preassoc_supp_rates) {
       os_free(preassoc_supp_rates);
       preassoc_supp_rates = NULL;
@@ -1719,6 +1735,26 @@ int update_hostap_iface(wifi_interface_info_t *interface)
     }
 
     return RETURN_OK;
+}
+
+static int hostapd_for_each_interface_adapter(struct hapd_interfaces *interfaces,
+    int (*cb)(struct hostapd_iface *iface, void *ctx), void *ctx)
+{
+    wifi_radio_info_t *radio;
+    unsigned int i;
+    int ret;
+
+    for (i = 0; i < g_wifi_hal.num_radios; i++) {
+        radio = &g_wifi_hal.radio_info[i];
+
+        interfaces = &radio->interfaces;
+        ret = hostapd_for_each_interface(interfaces, cb, ctx);
+        if (ret != 0) {
+            return ret;
+        }
+    }
+
+    return 0;
 }
 
 int update_hostap_interfaces(wifi_radio_info_t *radio)
@@ -1734,7 +1770,7 @@ int update_hostap_interfaces(wifi_radio_info_t *radio)
     }
 
     interfaces = &radio->interfaces;
-    interfaces->for_each_interface = hostapd_for_each_interface;
+    interfaces->for_each_interface = &hostapd_for_each_interface_adapter;
     interfaces->iface = radio->iface;
 
     pthread_mutex_lock(&g_wifi_hal.hapd_lock);
@@ -1963,7 +1999,7 @@ int update_hostap_config_params(wifi_radio_info_t *radio)
     iconf->acs = param->autoChannelEnabled;
     iconf->channel = param->channel;
 #if HOSTAPD_VERSION >= 210
-    iconf->op_class = param->op_class;
+    iconf->op_class = param->operatingClass;
 #endif
 
     get_coutry_str_from_oper_params(param, iconf->country);
@@ -2098,11 +2134,9 @@ int update_hostap_config_params(wifi_radio_info_t *radio)
         iconf->vht_capab |= VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
     }
 
-#if defined(TCXB7_PORT) || defined(TCXB8_PORT)
 #if HOSTAPD_VERSION >= 210
     iconf->mbssid = param->band == WIFI_FREQUENCY_6_BAND ? MBSSID_ENABLED : MBSSID_DISABLED;
 #endif /* HOSTAPD_VERSION >= 210 */
-#endif /* defined(TCXB7_PORT) || defined(TCXB8_PORT) */
 
     //validate_config_params
     if (hostapd_config_check(iconf, 1) < 0) {
@@ -2587,8 +2621,8 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
             wpa_sm_set_param(sm, WPA_PARAM_KEY_MGMT, key_mgmt);
         }
 
-        wifi_hal_dbg_print("update_wpa_sm_params%x %x %x\n", data.group_cipher, data.pairwise_cipher,
-            key_mgmt);
+        wifi_hal_dbg_print("%s:%d:%x %x %x\n", __func__, __LINE__, data.group_cipher,
+            data.pairwise_cipher, key_mgmt);
     } else {
         if (sec->mode == wifi_security_mode_none) {
             wpa_sm_set_param(sm, WPA_PARAM_KEY_MGMT, WPA_KEY_MGMT_NONE);
