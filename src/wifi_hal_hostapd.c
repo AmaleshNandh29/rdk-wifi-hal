@@ -3050,12 +3050,17 @@ void update_eapol_sm_params(wifi_interface_info_t *interface)
             wifi_hal_dbg_print("%s:%d:Pramod\n", __func__, __LINE__);
 #endif // CONFIG_WIFI_EMULATOR
             interface->u.sta.wpa_eapol_method.vendor = EAP_VENDOR_IETF;
-            interface->u.sta.wpa_eapol_config.identity = (unsigned char *)&sec->u.radius.identity;
+            interface->u.sta.wpa_eapol_config.identity = (unsigned char *)identity;
+            interface->u.sta.wpa_eapol_config.identity_len = strlen(identity);
+            interface->u.sta.wpa_eapol_config.password = (unsigned char *)password;
+            interface->u.sta.wpa_eapol_config.password_len = strlen(password);
+            interface->u.sta.wpa_eapol_config.anonymous_identity = (unsigned char*)anonymous_identity;
+	    interface->u.sta.wpa_eapol_config.anonymous_identity_len = strlen(anonymous_identity);
 
-            interface->u.sta.wpa_eapol_config.identity_len = strlen(sec->u.radius.identity);
-            interface->u.sta.wpa_eapol_config.password = (unsigned char *)&sec->u.radius.key;
-            interface->u.sta.wpa_eapol_config.password_len = strlen(sec->u.radius.key);
-
+         //   interface->u.sta.wpa_eapol_config.cert.ca_cert = (unsigned char *)ca_cert;
+         //   interface->u.sta.wpa_eapol_config.cert.domain_match = (unsigned char *)domain_match;
+            //interface->u.sta.wpa_eapol_config.cert.subject_match = (unsigned char *)subject_match;
+        wifi_hal_dbg_print("%s:%d:Pramod\n", __func__, __LINE__);
             interface->u.sta.wpa_eapol_config.eap_methods = &interface->u.sta.wpa_eapol_method;
             eapol_sm_notify_config(interface->u.sta.wpa_sm->eapol, &interface->u.sta.wpa_eapol_config, NULL);
         }
