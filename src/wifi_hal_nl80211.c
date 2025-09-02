@@ -66,9 +66,8 @@
 #if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
 #include "sme.h"
 #endif
-#ifdef CONFIG_WIFI_EMULATOR
 #include "config_supplicant.h"
-#elif defined(BANANA_PI_PORT)
+#if defined(BANANA_PI_PORT)
 #include "wpa_supplicant/config.h"
 #endif
 
@@ -3953,12 +3952,12 @@ int nl80211_create_bridge(const char *if_name, const char *br_name)
     }
 #endif
 
-    wifi_hal_info_print("%s:%d: bridge:%s interface:%s is hotspot:%d is lnf_psk:%d is_mdu_enabled:%d vap_name = %s\n", __func__, __LINE__,
-        br_name, if_name, is_hotspot_interface, is_lnf_psk_interface, is_mdu_enabled,
-        (vap_cfg != NULL)? vap_cfg->vap_name: "NULL");
+    wifi_hal_info_print("%s:%d: bridge:%s interface:%s is hotspot:%d is lnf_psk:%d is_mdu_enabled:%d vap_name = %s\n", __func__, __LINE__, br_name, if_name, is_hotspot_interface, is_lnf_psk_interface, is_mdu_enabled, (vap_cfg != NULL)? vap_cfg->vap_name: "NULL");
 
     if (access(OVS_MODULE, F_OK) == 0 && !is_hotspot_interface && !(is_lnf_psk_interface && is_mdu_enabled)) {
+        wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
         if (ovs_if_get_br(ovs_brname, if_name) == 0) {
+            wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
             if (strcmp(br_name, ovs_brname) != 0) {
                 wifi_hal_dbg_print("%s:%d mismatch\n",  __func__, __LINE__);
                 if((ovs_br_del_if(ovs_brname, if_name) != 0) || (ovs_br_add_if(br_name, if_name) != 0)) {
@@ -3967,13 +3966,17 @@ int nl80211_create_bridge(const char *if_name, const char *br_name)
                 }
             }
         } else {
+            wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
             if(ovs_br_exists(br_name) == 0) {
+        	wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
                 if (ovs_br_add_if(br_name, if_name) != 0) {
                     wifi_hal_error_print("%s:%d adding interface:%s to bridge:%s failed\n",  __func__, __LINE__, if_name, br_name);
                     return -1;
                 }
             } else {
+        	wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
                 if (ovs_add_br(br_name) == 0) {
+        	    wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
                     if (ovs_br_add_if(br_name, if_name) != 0) {
                         wifi_hal_error_print("%s:%d adding interface:%s to bridge:%s failed\n",  __func__, __LINE__, if_name, br_name);
                         return -1;
@@ -8982,11 +8985,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             interface->wpa_s.current_ssid->sae_password_id);
     }
 
-#ifdef CONFIG_WIFI_EMULATOR
     interface->wpa_s.driver = &g_wpa_supplicant_driver_nl80211_ops;
-#else
-    interface->wpa_s.driver = &g_wpa_driver_nl80211_ops;
-#endif
     memcpy(interface->wpa_s.conf->ssid, interface->wpa_s.current_ssid, sizeof(struct wpa_ssid));
     memcpy(interface->wpa_s.bssid, backhaul->bssid, ETH_ALEN);
     dl_list_add(&interface->wpa_s.bss, &interface->wpa_s.current_bss->list);
@@ -9033,7 +9032,8 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
         if (data.key_mgmt & WPA_KEY_MGMT_NONE) {
             wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_NONE;
         } else {
-            sel = (WPA_KEY_MGMT_PSK | WPA_KEY_MGMT_PSK_SHA256) & data.key_mgmt;
+            sel = (WPA_KEY_MGMT_SAE | WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK |
+                WPA_KEY_MGMT_PSK_SHA256 ) & data.key_mgmt;
             key_mgmt = pick_akm_suite(sel);
 
             if (key_mgmt == -1) {
@@ -9138,6 +9138,8 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
         nla_put_u32(msg, NL80211_ATTR_AUTH_TYPE, NL80211_AUTHTYPE_OPEN_SYSTEM);
         wifi_hal_dbg_print("security mode open:%d encr:%d\n", security->mode, security->encr);
     }
+        wifi_hal_dbg_print("security mode :%d encr:%d\n", security->mode, security->encr);
+
 #ifdef EAPOL_OVER_NL
     if (g_wifi_hal.platform_flags & PLATFORM_FLAGS_CONTROL_PORT_FRAME &&
         interface->bss_nl_connect_event_fd >= 0) {
@@ -9318,7 +9320,7 @@ int nl80211_start_scan(wifi_interface_info_t *interface, uint flags,
         }
 
         for (i = 0; i < num_ssid; i++) {
-            wifi_hal_stats_dbg_print("%s:%d: [SCAN] Added scan ssid '%s'\n", __func__, __LINE__, ssid_list[i]);
+            wifi_hal_dbg_print("%s:%d: [SCAN] Added scan ssid '%s'\n", __func__, __LINE__, ssid_list[i]);
             if (nla_put(msg, i + 1, wifi_strnlen(ssid_list[i], SSID_MAX_LEN), ssid_list[i])) {
                 wifi_hal_stats_error_print("%s:%d: [SCAN] nl message build failure (ssid's)\n", __func__, __LINE__);
                 goto failure;
@@ -9353,13 +9355,12 @@ int nl80211_start_scan(wifi_interface_info_t *interface, uint flags,
             goto failure;
         }
     }
-
     ret = nl80211_send_and_recv(msg, NULL, &g_wifi_hal, NULL, NULL);
     if (ret) {
         wifi_hal_stats_error_print("%s:%d: [SCAN] TRIGGER_SCAN command failed: ret=%d (%s)\n", __func__, __LINE__, ret, strerror(-ret));
         return -1;
     }
-    wifi_hal_stats_dbg_print("%s:%d: [SCAN] scan started successfully\n", __func__, __LINE__);
+    wifi_hal_dbg_print("%s:%d: [SCAN] scan started successfully\n", __func__, __LINE__);
     return 0;
 
 failure:
@@ -10328,6 +10329,8 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
         if (strcmp(scan_info_ap->ssid, vap->u.sta_info.ssid) == 0 &&
             strlen(vap->u.sta_info.ssid) > 0) {
             wifi_hal_stats_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s\n", __func__, __LINE__,
+                        to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid);
+            wifi_hal_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s\n", __func__, __LINE__,
                         to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid);
             memcpy(vap->u.sta_info.bssid, bssid, sizeof(bssid_t));
 #if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
@@ -14851,7 +14854,8 @@ int wifi_drv_set_operstate(void *priv, int state)
     }
 
     if (vap->vap_mode != wifi_vap_mode_monitor) {
-        // Both STAs and APs can register for management frames but not spurious frames
+        wifi_hal_dbg_print("%s:%d: Registering for management frames\n", __func__, __LINE__);
+	// Both STAs and APs can register for management frames but not spurious frames
         if (nl80211_register_mgmt_frames(interface) != 0) {
             wifi_hal_error_print("%s:%d: Failed to register for management frames\n", __func__, __LINE__);
             return -1;
@@ -14871,6 +14875,8 @@ int wifi_drv_set_operstate(void *priv, int state)
     }
 #ifndef EAPOL_OVER_NL
 #ifndef CONFIG_WIFI_EMULATOR
+    wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
+
     if (vap->vap_mode == wifi_vap_mode_ap) {
         sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
         if (sock_fd < 0) {
@@ -14885,6 +14891,7 @@ int wifi_drv_set_operstate(void *priv, int state)
         }
     }
 #else
+    wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
     if ((interface->vap_configured == true)  && (vap->vap_mode == wifi_vap_mode_sta)) {
 	 if (interface->u.sta.sta_sock_fd != 0) {
              close(interface->u.sta.sta_sock_fd);
@@ -14898,11 +14905,16 @@ int wifi_drv_set_operstate(void *priv, int state)
     }
 #endif
 
+#if 0
 #ifdef CONFIG_WIFI_EMULATOR
     ifname = vap->bridge_name;
 #else
     ifname = (vap->vap_mode == wifi_vap_mode_ap) ? vap->bridge_name:interface->name;
 #endif
+#endif
+    wifi_hal_dbg_print("%s:%d br-name : %s\n", __func__, __LINE__, vap->bridge_name);
+    ifname = vap->bridge_name;
+    wifi_hal_dbg_print("%s:%d br-name : %s if-name : %s\n", __func__, __LINE__, vap->bridge_name, ifname);
     memset(&sockaddr, 0, sizeof(struct sockaddr_ll));
     sockaddr.sll_family   = AF_PACKET;
     sockaddr.sll_ifindex  = if_nametoindex(ifname);
@@ -14916,6 +14928,7 @@ int wifi_drv_set_operstate(void *priv, int state)
         }
     } else {
 #ifndef CONFIG_WIFI_EMULATOR
+        wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
         sockaddr.sll_protocol = htons(ETH_P_EAPOL);
 #else
         sockaddr.sll_protocol = htons(ETH_P_ALL);
@@ -14935,6 +14948,7 @@ int wifi_drv_set_operstate(void *priv, int state)
     }
 
 #else
+    wifi_hal_dbg_print("%s:%d\n", __func__, __LINE__);
     if (vap->vap_mode == wifi_vap_mode_sta) {
         if (nl80211_register_bss_frames(interface) != 0) {
             wifi_hal_error_print("%s:%d: Failed to register for bss frames\n", __func__, __LINE__);
@@ -15053,7 +15067,7 @@ int wifi_drv_get_ssid(void *priv, u8 *ssid)
 #endif
 }
 
-#if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
+//#if !defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
 int wifi_supplicant_drv_associate(void *priv, struct wpa_driver_associate_params *params)
 {
     wifi_hal_dbg_print("%s:%d: Enter\n", __func__, __LINE__);
@@ -15122,7 +15136,7 @@ int wifi_supplicant_drv_associate(void *priv, struct wpa_driver_associate_params
 
     return -1;
 }
-#endif // CONFIG_WIFI_EMULATOR || BANANA_PI_PORT
+//#endif // CONFIG_WIFI_EMULATOR || BANANA_PI_PORT
 
 int wifi_supplicant_drv_authenticate(void *priv, struct wpa_driver_auth_params *params)
 {
@@ -15161,7 +15175,7 @@ int wifi_supplicant_drv_authenticate(void *priv, struct wpa_driver_auth_params *
     return -1;
 }
 
-#if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
+//#if !defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
 int wifi_supplicant_drv_get_bssid(void *priv, u8 *bssid)
 {
     wifi_hal_dbg_print("%s:%d: Enter\n", __func__, __LINE__);
@@ -15171,7 +15185,7 @@ int wifi_supplicant_drv_get_bssid(void *priv, u8 *bssid)
     os_memcpy(bssid, interface->wpa_s.current_bss->bssid, ETH_ALEN);
     return 0;
 }
-#endif //CONFIG_WIFI_EMULATOR || BANANA_PI_PORT
+//#endif //CONFIG_WIFI_EMULATOR || BANANA_PI_PORT
 
 int     wifi_drv_send_eapol(void *priv, const u8 *addr, const u8 *data,
                     size_t data_len, int encrypt,
@@ -17326,7 +17340,7 @@ int wifi_drv_get_sta_auth_type(void *priv, const u8 *addr, int auth_key,int fram
 const struct wpa_driver_ops g_wpa_driver_nl80211_ops = {
     .name = "nl80211",
     .desc = "Linux nl80211/cfg80211",
-#if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
+#if defined(BANANA_PI_PORT)
     .get_bssid = wifi_supplicant_drv_get_bssid,
 #else
     .get_bssid = wifi_drv_get_bssid,
@@ -17339,7 +17353,7 @@ const struct wpa_driver_ops g_wpa_driver_nl80211_ops = {
     .get_scan_results2 = wifi_drv_get_scan_results,
     .abort_scan = wifi_drv_abort_scan,
     .deauthenticate = wifi_drv_deauthenticate,
-#if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
+#if defined(BANANA_PI_PORT)
     .authenticate = wifi_supplicant_drv_authenticate,
     .associate = wifi_supplicant_drv_associate,
 #else
@@ -17506,7 +17520,7 @@ const struct wpa_driver_ops g_wpa_driver_nl80211_ops = {
 #endif /* HOSTAPD_VERSION >= 210 */
 };
 
-#ifdef CONFIG_WIFI_EMULATOR
+//#ifndef CONFIG_WIFI_EMULATOR
 const struct wpa_driver_ops g_wpa_supplicant_driver_nl80211_ops = {
     .name = "nl80211",
     .desc = "Linux nl80211/cfg80211",
@@ -17663,4 +17677,4 @@ const struct wpa_driver_ops g_wpa_supplicant_driver_nl80211_ops = {
     .get_sta_auth_type = wifi_drv_get_sta_auth_type,
 #endif /* HOSTAPD_VERSION >= 210 */
 };
-#endif //CONFIG_WIFI_EMULATOR
+//#endif //CONFIG_WIFI_EMULATOR
