@@ -14905,15 +14905,11 @@ int wifi_drv_set_operstate(void *priv, int state)
     }
 #endif
 
-#if 0
 #ifdef CONFIG_WIFI_EMULATOR
     ifname = vap->bridge_name;
 #else
     ifname = (vap->vap_mode == wifi_vap_mode_ap) ? vap->bridge_name:interface->name;
 #endif
-#endif
-    wifi_hal_dbg_print("%s:%d br-name : %s\n", __func__, __LINE__, vap->bridge_name);
-    ifname = vap->bridge_name;
     wifi_hal_dbg_print("%s:%d br-name : %s if-name : %s\n", __func__, __LINE__, vap->bridge_name, ifname);
     memset(&sockaddr, 0, sizeof(struct sockaddr_ll));
     sockaddr.sll_family   = AF_PACKET;
