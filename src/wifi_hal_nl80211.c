@@ -8938,6 +8938,8 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
         if (strcmp(scan_info_ap->ssid, vap->u.sta_info.ssid) == 0) {
             wifi_hal_stats_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s\n", __func__, __LINE__,
                         to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid);
+            wifi_hal_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s\n", __func__, __LINE__,
+                        to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid);
             memcpy(vap->u.sta_info.bssid, bssid, sizeof(bssid_t));
 #ifdef CONFIG_WIFI_EMULATOR
             if (bss[NL80211_BSS_INFORMATION_ELEMENTS]) {
@@ -13348,11 +13350,16 @@ int wifi_drv_set_operstate(void *priv, int state)
     }
 #endif
 
+#if 0
 #ifdef CONFIG_WIFI_EMULATOR
     ifname = vap->bridge_name;
 #else
     ifname = (vap->vap_mode == wifi_vap_mode_ap) ? vap->bridge_name:interface->name;
 #endif
+#endif
+    wifi_hal_dbg_print("%s:%d br-name : %s\n", __func__, __LINE__, vap->bridge_name);
+    ifname = vap->bridge_name;
+    wifi_hal_dbg_print("%s:%d br-name : %s if-name : %s\n", __func__, __LINE__, vap->bridge_name, ifname);
     memset(&sockaddr, 0, sizeof(struct sockaddr_ll));
     sockaddr.sll_family   = AF_PACKET;
     sockaddr.sll_ifindex  = if_nametoindex(ifname);
@@ -13497,7 +13504,7 @@ int wifi_drv_get_ssid(void *priv, u8 *ssid)
 #endif
 }
 
-#ifdef CONFIG_WIFI_EMULATOR
+#ifndef CONFIG_WIFI_EMULATOR
 int wifi_supplicant_drv_associate(void *priv, struct wpa_driver_associate_params *params)
 {
     wifi_hal_dbg_print("%s:%d: Enter\n", __func__, __LINE__);

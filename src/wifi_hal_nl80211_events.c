@@ -713,7 +713,7 @@ static void nl80211_connect_event(wifi_interface_info_t *interface, struct nlatt
     if (sec->mode == wifi_security_mode_none) {
         wpa_sm_set_state(interface->u.sta.wpa_sm, WPA_COMPLETED);
     }
-#ifdef CONFIG_WIFI_EMULATOR
+#ifndef CONFIG_WIFI_EMULATOR
     wpa_supplicant_cancel_auth_timeout(&interface->wpa_s);
 #endif
     interface->u.sta.state = WPA_ASSOCIATED;

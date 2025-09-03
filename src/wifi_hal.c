@@ -37,9 +37,7 @@
 #include "ap/rrm.h"
 #include "ap/neighbor_db.h"
 
-#ifdef CONFIG_WIFI_EMULATOR
 #include "config_supplicant.h"
-#endif
 
 #define MAC_ADDRESS_LEN 6
 
@@ -87,9 +85,9 @@
 static int g_fd_arr[MAX_VAP] = {0};
 static int g_IfIdx_arr[MAX_VAP] = {0};
 static unsigned char g_vapSmac[MAX_VAP][MAC_ADDRESS_LEN] = {'\0'};
-#ifdef CONFIG_WIFI_EMULATOR
+//#ifdef CONFIG_WIFI_EMULATOR
 extern const struct wpa_driver_ops g_wpa_supplicant_driver_nl80211_ops;
-#endif
+//#endif
 
 #if !defined(CMXB7_PORT)
 wifi_hal_priv_t g_wifi_hal;
@@ -1334,6 +1332,7 @@ INT wifi_hal_createVAP(wifi_radio_index_t index, wifi_vap_info_map_t *map)
                 interface->u.sta.sta_4addr = (int)sta_4addr;
             }
         }
+    	wifi_hal_info_print("%s:%d: interface:%s sta-4addr : %d\n", __func__, __LINE__, interface->name, interface->u.sta.sta_4addr);
 #endif
         wifi_hal_info_print("%s:%d: interface:%s set mode:%d\n", __func__, __LINE__,
             interface->name, vap->vap_mode);
@@ -1511,13 +1510,33 @@ INT wifi_hal_createVAP(wifi_radio_index_t index, wifi_vap_info_map_t *map)
             wifi_hal_info_print("%s:%d: interface:%s set operstate 1\n", __func__,
                     __LINE__, interface->name);
             wifi_drv_set_operstate(interface, 1);
+            nl80211_interface_enable(interface->name, true);
 
             nl80211_interface_enable(interface->name, true);
 #else
             //XXX set correct status after reconfigure and call conn status callback
             //nl80211_start_scan(interface);
+	    wifi_hal_error_print("%s:%d:iface-name : %s bridge-name : %s\n", __func__, __LINE__, interface->name, vap->bridge_name);
+
+	    nl80211_interface_enable(interface->name, false);
+            nl80211_set_mac(interface);
             interface->vap_initialized = true;
-            if (radio->configured && radio->oper_param.enable) {
+            nl80211_interface_enable(interface->name, true);
+
+	        wifi_hal_error_print("%s:%d Creating bridge\n", __func__, __LINE__);
+		if (nl80211_create_bridge(interface->name, vap->bridge_name) != 0) {
+                     wifi_hal_error_print("%s:%d: interface:%s failed to create bridge:%s\n",
+                        __func__, __LINE__, interface->name, vap->bridge_name);
+        }
+        wifi_hal_info_print("%s:%d: interface:%s set bridge %s up\n", __func__, __LINE__,
+                    interface->name, vap->bridge_name);
+        if (nl80211_interface_enable(vap->bridge_name, true) != 0) {
+            wifi_hal_error_print("%s:%d: interface:%s failed to set bridge %s up\n",
+                        __func__, __LINE__, interface->name, vap->bridge_name);
+           	//     continue;
+        }
+
+        if (radio->configured && radio->oper_param.enable) {
                 wifi_hal_info_print("%s:%d: interface:%s set operstate 1\n", __func__,
                     __LINE__, interface->name);
                 wifi_drv_set_operstate(interface, 1);
@@ -1570,7 +1589,7 @@ INT wifi_hal_createVAP(wifi_radio_index_t index, wifi_vap_info_map_t *map)
                     __LINE__, vap->vap_index, vap->u.bss_info.mgmtPowerControl);
             }
         }
-#ifdef CONFIG_WIFI_EMULATOR
+#ifndef CONFIG_WIFI_EMULATOR
         //Init wpa-supplicant params.
         if (vap->vap_mode == wifi_vap_mode_sta) {
             deinit_wpa_supplicant(interface);
@@ -4307,6 +4326,18 @@ int wifi_hal_setApMacAddressControlMode(uint32_t apIndex, uint32_t mac_filter_mo
     }
 
     return (nl80211_set_acl(interface));
+}
+
+int wifi_hal_add_station_bridge( char *interface_name,char *bridge_name)
+{
+    wifi_hal_error_print("Enter %s:%d\n",__func__,__LINE__);
+   nl80211_remove_from_bridge(interface_name);
+    if (nl80211_create_bridge(interface_name, bridge_name) != 0) {
+        wifi_hal_error_print("%s:%d: interface:%s failed to create bridge:%s\n",
+            __func__, __LINE__, interface_name, bridge_name);
+        return RETURN_ERR;
+    }
+    return 0;
 }
 
 bool is_db_upgrade_required(char* inactive_firmware)

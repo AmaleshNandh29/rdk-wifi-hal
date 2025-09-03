@@ -65,7 +65,7 @@
 #include "collection.h"
 #include "driver.h"
 
-#ifdef CONFIG_WIFI_EMULATOR
+#ifndef CONFIG_WIFI_EMULATOR
 #include "wpa_supplicant_i.h"
 #include "bss.h"
 #include "sme.h"
@@ -213,7 +213,7 @@ extern "C" {
 #endif /* HOSTAPD_VERSION >= 211 */
 
 extern const struct wpa_driver_ops g_wpa_driver_nl80211_ops;
-#ifdef CONFIG_WIFI_EMULATOR
+#ifndef CONFIG_WIFI_EMULATOR
 extern const struct wpa_driver_ops g_wpa_supplicant_driver_nl80211_ops;
 #endif
 typedef struct wifi_enum_to_str_map
@@ -457,8 +457,8 @@ typedef struct wifi_interface_info_t {
     size_t ie_len;
     unsigned char *beacon_ie;
     size_t beacon_ie_len;
-    struct wpa_supplicant wpa_s;
 #endif
+    struct wpa_supplicant wpa_s;
 } wifi_interface_info_t;
 
 #define MAX_RATES   16
