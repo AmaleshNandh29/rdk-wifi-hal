@@ -2991,12 +2991,14 @@ void update_eapol_sm_params(wifi_interface_info_t *interface)
                 break;
             case WIFI_EAP_TYPE_TTLS:
                 interface->u.sta.wpa_eapol_method.method = EAP_TYPE_TTLS;
+                eap_peer_ttls_register();
+                break;
             default:
-                //interface->u.sta.wpa_eapol_method.method = EAP_TYPE_TTLS;
-                //eap_peer_ttls_register();
+                interface->u.sta.wpa_eapol_method.method = EAP_TYPE_TTLS;
+                eap_peer_ttls_register();
                 wifi_hal_error_print("%s:%d: Unsupported EAP method :%d\n", __func__, __LINE__,
                     sec->u.radius.eap_type);
-                return;
+                //return;
             }
 #ifndef CONFIG_WIFI_EMULATOR
             if (vap->vap_mode == wifi_vap_mode_sta) {
