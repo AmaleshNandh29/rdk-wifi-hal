@@ -3033,6 +3033,8 @@ void update_eapol_sm_params(wifi_interface_info_t *interface)
                     break;
                 }
             }
+            interface->u.sta.wpa_eapol_method.vendor = EAP_VENDOR_IETF;
+
             interface->wpa_s.current_ssid->eap.fragment_size = 400;
             wifi_hal_dbg_print("%s:%d:Pramod\n", __func__, __LINE__);
             interface->wpa_s.current_ssid->eap.identity = (unsigned char *)identity;
