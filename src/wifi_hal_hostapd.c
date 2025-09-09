@@ -3047,6 +3047,12 @@ void update_eapol_sm_params(wifi_interface_info_t *interface)
             eapol_sm_notify_portControl(interface->u.sta.wpa_sm->eapol, Auto);
             wifi_hal_dbg_print("%s:%d:Pramod\n", __func__, __LINE__);
 #endif // CONFIG_WIFI_EMULATOR
+            interface->u.sta.wpa_eapol_config.phase2 = (char *)malloc(MAX_STR_LEN);
+            if (interface->u.sta.wpa_eapol_config.phase2 == NULL) {
+                wifi_hal_error_print("%s:%d: NULL Pointer\n", __func__, __LINE__);
+                return;
+            }
+
             strncpy(interface->u.sta.wpa_eapol_config.phase2, "auth=MSCHAP", MAX_STR_LEN - 1);
             interface->u.sta.wpa_eapol_method.vendor = EAP_VENDOR_IETF;
             interface->u.sta.wpa_eapol_config.identity = (unsigned char *)identity;
