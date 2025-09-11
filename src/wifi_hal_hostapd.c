@@ -3033,9 +3033,8 @@ void update_eapol_sm_params(wifi_interface_info_t *interface)
                     break;
                 }
             }
-            interface->u.sta.wpa_eapol_method.vendor = EAP_VENDOR_IETF;
 
-            interface->wpa_s.current_ssid->eap.fragment_size = 400;
+			interface->wpa_s.current_ssid->eap.fragment_size = 400;
             wifi_hal_dbg_print("%s:%d:Pramod\n", __func__, __LINE__);
             interface->wpa_s.current_ssid->eap.identity = (unsigned char *)identity;
             interface->wpa_s.current_ssid->eap.identity_len = strlen(identity);
@@ -3054,6 +3053,7 @@ void update_eapol_sm_params(wifi_interface_info_t *interface)
             }
 
             strncpy(interface->u.sta.wpa_eapol_config.phase2, "auth=MSCHAP", MAX_STR_LEN - 1);
+			interface->u.sta.wpa_eapol_config.fragment_size = 400;
             interface->u.sta.wpa_eapol_method.vendor = EAP_VENDOR_IETF;
             interface->u.sta.wpa_eapol_config.identity = (unsigned char *)identity;
             interface->u.sta.wpa_eapol_config.identity_len = strlen(identity);
