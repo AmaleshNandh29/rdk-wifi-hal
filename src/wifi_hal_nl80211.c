@@ -7916,6 +7916,7 @@ static int scan_results_handler(struct nl_msg *msg, void *arg)
     bool is_wildcard_ssid = false;
 
     wifi_hal_stats_dbg_print("%s:%d: [SCAN] ENTER\n", __func__, __LINE__);
+    wifi_hal_dbg_print("%s:%d: [SCAN] ENTER\n", __func__, __LINE__);
 
     *finish_data->err = 0;
 
@@ -7936,6 +7937,7 @@ static int scan_results_handler(struct nl_msg *msg, void *arg)
         }
         return NL_SKIP;
     }
+    wifi_hal_dbg_print("%s:%d: ssid:%s index:%d count:%d \n", __func__, __LINE__, interface->vap_info.u.sta_info.ssid, interface->index, count);
 
     bss = calloc(count, sizeof(wifi_bss_info_t));
     if (!bss) {
@@ -8014,6 +8016,7 @@ static int scan_results_handler(struct nl_msg *msg, void *arg)
                 bss = new_bss;
         }
 
+            wifi_hal_dbg_print("%s:%d: radio_index:%d ssid_found_count:%d  \n", __func__, __LINE__, interface->vap_info.radio_index, ssid_found_count);
         // It is assumed that "bss" has to be released by callback function:
         callbacks->scan_result_callback(interface->vap_info.radio_index, &bss, &ssid_found_count);
     } else {
@@ -10227,11 +10230,12 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
         return NL_SKIP;
     }
 
+    wpa_hexdump(MSG_MSGDUMP, "Scan Result IE:", ie, len);
     if (bss[NL80211_BSS_BEACON_IES]) {
         beacon_ies = nla_data(bss[NL80211_BSS_BEACON_IES]);
         beacon_ie_len = nla_len(bss[NL80211_BSS_BEACON_IES]);
     }
-
+    wpa_hexdump(MSG_MSGDUMP, "Scan Result Beacon IE:", beacon_ies, beacon_ie_len);
     // - create separate AP info entry for wifi_getNeighboringWiFiStatus().
     //   The scan_info_ap_map contains all SSID's including hidden (with empty SSID name)
     scan_info_ap = (wifi_bss_info_t *)calloc(1, sizeof(wifi_bss_info_t));
@@ -10313,9 +10317,11 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
     if (ie) {
         // Parse standard IEs including SSID
         parse_ies(ie, len, scan_info_ap);
+        wifi_hal_dbg_print("%s:%d: parse standard ies \n", __func__, __LINE__);
     } else {
         // Parse IEs from beacon IEs (including SSID)
         parse_ies(beacon_ies, beacon_ie_len, scan_info_ap);
+        wifi_hal_dbg_print("%s:%d: parse beacon ies \n", __func__, __LINE__);
     }
 
     if (ie != NULL && len > 0) {
@@ -10330,8 +10336,10 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
             strlen(vap->u.sta_info.ssid) > 0) {
             wifi_hal_stats_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s\n", __func__, __LINE__,
                         to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid);
-            wifi_hal_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s\n", __func__, __LINE__,
-                        to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid);
+            wifi_hal_dbg_print("%s:%d: [SCAN] found backhaul bssid:%s rssi:%d on freq:%d for ssid:%s sec_mode:%d oper_freq_band:%d ie_len:%d \n", __func__, __LINE__,
+                        to_mac_str(bssid, bssid_str), scan_info_ap->rssi, scan_info_ap->freq, scan_info_ap->ssid, scan_info_ap->sec_mode,
+                        scan_info_ap->oper_freq_band, scan_info_ap->ie_len);
+            wpa_hexdump(MSG_MSGDUMP, "scan_info_ap IE:", scan_info_ap->ie, scan_info_ap->ie_len);
             memcpy(vap->u.sta_info.bssid, bssid, sizeof(bssid_t));
 #if defined(CONFIG_WIFI_EMULATOR) || defined(BANANA_PI_PORT)
 
@@ -10379,6 +10387,10 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
         wifi_hal_stats_dbg_print("%s:%d: [SCAN] found bss:%s rssi:%d ssid:%s on freq:%d \n",
             __func__, __LINE__, to_mac_str(bssid, bssid_str), scan_info_ap->rssi,
             scan_info_ap->ssid, scan_info_ap->freq);
+        wifi_hal_dbg_print("%s:%d: [SCAN] found bss:%s rssi:%d ssid:%s on freq:%d \n",
+            __func__, __LINE__, to_mac_str(bssid, bssid_str), scan_info_ap->rssi,
+            scan_info_ap->ssid, scan_info_ap->freq);
+
         wifi_bss_info_t *scan_info = NULL;
         pthread_mutex_lock(&interface->scan_info_mutex);
         scan_info = hash_map_get(interface->scan_info_map, key);
@@ -10401,6 +10413,8 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
         }
         // - copy full info
         *scan_info = *scan_info_ap;
+        wifi_hal_dbg_print("%s:%d: scan_info copied ssid:%s freq:%d sec_mode:%d \n", __func__,
+            __LINE__, scan_info->ssid, scan_info->freq, scan_info->sec_mode);
         pthread_mutex_unlock(&interface->scan_info_mutex);
     }
 
