@@ -2280,7 +2280,7 @@ int pick_akm_suite(int sel)
 #endif
 #ifdef CONFIG_IEEE80211W
     } else if (sel & WPA_KEY_MGMT_IEEE8021X_SHA256) {
-        wifi_hal_dbg_print("%s:%d: WPA: using KEY_MGMT 802.1X with SHA256\n", __func__, __LINE__);
+        wifi_hal_error_print("%s:%d: WPA: using KEY_MGMT 802.1X with SHA256\n", __func__, __LINE__);
         return  WPA_KEY_MGMT_IEEE8021X_SHA256;
     } else if (sel & WPA_KEY_MGMT_PSK_SHA256) {
         wifi_hal_dbg_print("%s:%d: WPA: using KEY_MGMT PSK with SHA256\n", __func__, __LINE__);

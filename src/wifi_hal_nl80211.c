@@ -9035,8 +9035,9 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
         if (data.key_mgmt & WPA_KEY_MGMT_NONE) {
             wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_NONE;
         } else {
-            sel = (WPA_KEY_MGMT_SAE | WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK |
-                WPA_KEY_MGMT_PSK_SHA256 ) & data.key_mgmt;
+            sel = (WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK |
+                WPA_KEY_MGMT_PSK_SHA256 | WPA_KEY_MGMT_IEEE8021X_SHA256 ) & data.key_mgmt;
+            wifi_hal_error_print("%s:%d AKM suite: 0x%x\n", __func__, __LINE__, data.key_mgmt);
             key_mgmt = pick_akm_suite(sel);
 
             if (key_mgmt == -1) {
@@ -9081,8 +9082,10 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_IEEE8021X;
                     break;
                 case wifi_security_mode_wpa3_personal:
-                case wifi_security_mode_wpa3_enterprise:
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_SAE;
+                    break;
+                case wifi_security_mode_wpa3_enterprise:
+                    wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_IEEE8021X_SHA256;
                     break;
                 case wifi_security_mode_wpa3_transition:
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_PSK | WPA_KEY_MGMT_SAE;
@@ -9100,6 +9103,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             }
         }
     }
+    wifi_hal_info_print("%s:%d: security mode: %d\r\n", __func__, __LINE__, security->mode);
 
     wpa_conf.ieee80211w = 0;
 
@@ -9121,7 +9125,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             nla_put(msg, NL80211_ATTR_IE, pos - rsn_ie, rsn_ie);
         }
 
-        if (security->mode == wifi_security_mode_wpa2_enterprise || security->mode == wifi_security_mode_wpa2_personal)
+        if (security->mode == wifi_security_mode_wpa2_enterprise || security->mode == wifi_security_mode_wpa2_personal || security->mode == wifi_security_mode_wpa3_enterprise)
             ver |= NL80211_WPA_VERSION_2;
         else
             ver |= NL80211_WPA_VERSION_1;
@@ -9134,6 +9138,10 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, RSN_AUTH_KEY_MGMT_UNSPEC_802_1X);
         else if (security->mode == wifi_security_mode_wpa2_personal)
             nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X);
+		else if (security->mode == wifi_security_mode_wpa3_enterprise) {
+			wifi_hal_error_print("%s:%d NL80211_ATTR_AKM_SUITES security mode:%d encr:%d\n", __func__, __LINE__, security->mode, security->encr);
+			nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, RSN_AUTH_KEY_MGMT_802_1X_SHA256);
+		}
 
         nla_put_u32(msg, NL80211_ATTR_AUTH_TYPE, NL80211_AUTHTYPE_OPEN_SYSTEM);
         nla_put_flag(msg, NL80211_ATTR_PRIVACY);
@@ -9654,7 +9662,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
                     bss->enc_method = wifi_encryption_tkip;
                     break;
                 case RSN_CIPHER_SUITE_CCMP:
-	                bss->sec_mode = add_wpa2(bss->sec_mode) | add_wpa3(bss->sec_mode);
+	                bss->sec_mode = add_wpa2(bss->sec_mode);
                     bss->enc_method = wifi_encryption_aes;
                     break;
                 case RSN_CIPHER_SUITE_GCMP:
@@ -9704,10 +9712,15 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
                 case RSN_AUTH_KEY_MGMT_UNSPEC_802_1X:
                     bss->sec_mode = add_enterprise(bss->sec_mode);
                     break;
+                case RSN_AUTH_KEY_MGMT_802_1X_SHA256:
+                    wifi_hal_error_print("%s:%d: [SCAN] RSN_AUTH_KEY_MGMT_802_1X_SHA256 sec_mode:%d \n", __func__, __LINE__, bss->sec_mode);
+                    bss->sec_mode = wifi_security_mode_wpa3_enterprise;
+                    break;
                 default:
                     // unsupported combination (can be exteneded in future)
                     break;
             }
+			wifi_hal_error_print("%s:%d: [SCAN] sec_mode:%d enc_method:%d \n", __func__, __LINE__, bss->sec_mode, bss->enc_method);
             len -= 4; data += 4;
         }
     }
