@@ -9549,6 +9549,8 @@ static inline wifi_security_modes_t add_enterprise(wifi_security_modes_t mode)
             return wifi_security_mode_wpa_enterprise;
         case wifi_security_mode_wpa_wpa2_enterprise:
             return wifi_security_mode_wpa_wpa2_enterprise;
+        case wifi_security_mode_wpa3_enterprise:
+            return wifi_security_mode_wpa3_enterprise;
         default:
             return wifi_security_mode_wpa2_enterprise;
     }
@@ -9590,6 +9592,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
     // - group suit type
     {
         uint32_t group_suite_type = WPA_GET_BE32(data);
+		wifi_hal_error_print("%s:%d: [SCAN] group_suite_type:%u \n", __func__, __LINE__, group_suite_type);
         switch (group_suite_type) {
             case RSN_CIPHER_SUITE_NONE:
                 bss->sec_mode = wifi_security_mode_none;
@@ -9619,6 +9622,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
                 // unsupported combination (can be exteneded in future)
                 break;
         }
+		wifi_hal_error_print("%s:%d: [SCAN] sec_mode:%d enc_method:%d \n", __func__, __LINE__, bss->sec_mode, bss->enc_method);
         len -= 4; data += 4;
     }
 
@@ -9633,6 +9637,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
     {
         for (i = 0; i < suite_count; ++i) {
             uint32_t suite_type = WPA_GET_BE32(data);
+			wifi_hal_error_print("%s:%d: [SCAN] suite_type:%u \n", __func__, __LINE__, suite_type);
             switch (suite_type) {
                 case RSN_CIPHER_SUITE_NONE:
                     break;
@@ -9649,7 +9654,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
                     bss->enc_method = wifi_encryption_tkip;
                     break;
                 case RSN_CIPHER_SUITE_CCMP:
-                    bss->sec_mode = add_wpa2(bss->sec_mode);
+	                bss->sec_mode = add_wpa2(bss->sec_mode) | add_wpa3(bss->sec_mode);
                     bss->enc_method = wifi_encryption_aes;
                     break;
                 case RSN_CIPHER_SUITE_GCMP:
@@ -9661,6 +9666,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
                     break;
             }
             len -= 4; data += 4;
+			wifi_hal_error_print("%s:%d: [SCAN] sec_mode:%d enc_method:%d \n", __func__, __LINE__, bss->sec_mode, bss->enc_method);	
         }
     }
 
@@ -9678,6 +9684,7 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
     {
         for (i = 0; i < suite_count; ++i) {
             uint32_t suite_type = WPA_GET_BE32(data);
+			wifi_hal_error_print("%s:%d: [SCAN] suite_type:%u \n", __func__, __LINE__, suite_type);
             switch (suite_type) {
                 case RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X:
                     if (multiple_suite_count == true) {
