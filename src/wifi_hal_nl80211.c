@@ -9136,7 +9136,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             ver |= NL80211_WPA_VERSION_1;
         nla_put_u32(msg, NL80211_ATTR_WPA_VERSIONS, ver);
 
-        nla_put_u32(msg, NL80211_ATTR_CIPHER_SUITES_PAIRWISE, RSN_CIPHER_SUITE_CCMP | RSN_CIPHER_SUITE_BIP_GMAC_256);
+        nla_put_u32(msg, NL80211_ATTR_CIPHER_SUITES_PAIRWISE, RSN_CIPHER_SUITE_CCMP);
         nla_put_u32(msg, NL80211_ATTR_CIPHER_SUITE_GROUP, RSN_CIPHER_SUITE_CCMP);
 
         if (security->mode == wifi_security_mode_wpa2_enterprise)
@@ -9145,7 +9145,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X);
 		else if (security->mode == wifi_security_mode_wpa3_enterprise) {
 			wifi_hal_error_print("%s:%d NL80211_ATTR_AKM_SUITES security mode:%d encr:%d\n", __func__, __LINE__, security->mode, security->encr);
-			nla_put_u32(msg, NL80211_ATTR_AKM_SUITES,  RSN_AUTH_KEY_MGMT_802_1X_SHA256 | RSN_AUTH_KEY_MGMT_802_1X_SUITE_B_192);
+			nla_put_u32(msg, NL80211_ATTR_AKM_SUITES,  RSN_AUTH_KEY_MGMT_802_1X_SHA256);
 		}
 
         nla_put_u32(msg, NL80211_ATTR_AUTH_TYPE, NL80211_AUTHTYPE_OPEN_SYSTEM);
@@ -10247,6 +10247,7 @@ static int scan_info_handler(struct nl_msg *msg, void *arg)
     if (bss[NL80211_BSS_INFORMATION_ELEMENTS]) {
         ie = nla_data(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
         len = nla_len(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+        wifi_hal_error_print("%s:%d len:%d \n", __func__, __LINE__, len);
         //wifi_hal_stats_dbg_print("[SCAN] BSSID: %s, IE LEN %d\n", bssid_str, len);
         if (len > 512) {
             wifi_hal_stats_error_print("[Wrong NL SCAN output] BSSID: %s, IE LEN %d\n", bssid_str, len);

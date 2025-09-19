@@ -2604,7 +2604,7 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
     sec = &vap->u.sta_info.security;
     assoc_req = interface->u.sta.assoc_req;
 
-    wifi_hal_dbg_print("%s:%d:bssid:%s frequency:%d ssid:%s\n", __func__, __LINE__,
+    wifi_hal_error_print("%s:%d:bssid:%s frequency:%d ssid:%s\n", __func__, __LINE__,
         to_mac_str(backhaul->bssid, bssid_str), backhaul->freq, backhaul->ssid);
 
     if (interface->u.sta.wpa_sm == NULL) {
@@ -2644,6 +2644,7 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
 #ifdef CONFIG_IEEE80211W
     unsigned int ieee80211w;
     ieee80211w = (enum mfp_options)sec->mfp;
+    wifi_hal_error_print("%s:%d: ieee80211w:%d \n", __func__, __LINE__, ieee80211w);
     switch (ieee80211w) {
     case MGMT_FRAME_PROTECTION_REQUIRED:
         wpa_key_mgmt_11w &= ~(WPA_KEY_MGMT_PSK | WPA_KEY_MGMT_IEEE8021X);
@@ -2693,6 +2694,7 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
     wpa_sm_set_param(sm, WPA_PARAM_PROTO, WPA_PROTO_RSN);
 
     rsn_ie = (ieee80211_tlv_t *)get_ie(backhaul->ie, backhaul->ie_len, WLAN_EID_RSN);
+    wifi_hal_error_print("%s:%d rsn_ie:%p \n", __func__, __LINE__, rsn_ie);
     if (rsn_ie &&
         (wpa_parse_wpa_ie_rsn((const unsigned char *)rsn_ie,
              rsn_ie->length + sizeof(ieee80211_tlv_t), &data) == 0)) {
@@ -2727,11 +2729,12 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
 #endif
             {
                 sel = (WPA_KEY_MGMT_SAE | WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK |
-                    WPA_KEY_MGMT_PSK_SHA256 | wpa_key_mgmt_11w) & data.key_mgmt;
+                    WPA_KEY_MGMT_PSK_SHA256 | wpa_key_mgmt_11w | WPA_KEY_MGMT_IEEE8021X_SHA256) & data.key_mgmt;
             }
 
-            key_mgmt = pick_akm_suite(sel); 
-
+            key_mgmt = pick_akm_suite(sel);
+            wifi_hal_error_print("%s:%d Group:%d Pairwise:%d d.key_mgmt:%d security mode:%d key_mgmt:%d sel:%d \n",
+                 __func__, __LINE__, data.group_cipher, data.pairwise_cipher, data.key_mgmt, sec->mode, key_mgmt, sel);
             if (key_mgmt == -1) {
                 wifi_hal_error_print("Unsupported AKM suite: 0x%x\n", data.key_mgmt);
                 return;
@@ -2741,7 +2744,7 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
         }
 
         wifi_hal_dbg_print("%s:%d:Pramod\n", __func__, __LINE__);
-        wifi_hal_dbg_print("%s:%d:%x %x %x\n", __func__, __LINE__, data.group_cipher,
+        wifi_hal_dbg_print("%s:%d:Group:%x pairwise:%x Key_Mgmt:%x\n", __func__, __LINE__, data.group_cipher,
             data.pairwise_cipher, key_mgmt);
     } else {
         if (sec->mode == wifi_security_mode_none) {
@@ -2777,6 +2780,7 @@ void update_wpa_sm_params(wifi_interface_info_t *interface)
                 return;
             }
             key_mgmt = pick_akm_suite(sel);
+            wifi_hal_error_print("%s:%d security mode :%d key_mgmt:%d sel:%d \n", __func__, __LINE__, sec->mode, key_mgmt, sel);
             if (key_mgmt == -1) {
                 wifi_hal_error_print("Unsupported AKM suite: 0x%x\n", sel);
                 return;
