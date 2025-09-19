@@ -8853,6 +8853,8 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             __LINE__, security->encr);
         return -1;
     }
+    wifi_hal_info_print("%s:%d: Current BSS encryption mode:%d Pairwise_Cipher:%d \n", __func__,
+            __LINE__, security->encr, interface->wpa_s.current_ssid->pairwise_cipher);
 
     update_wpa_sm_params(interface);
     init_wpa_sm_param(interface);
@@ -9017,7 +9019,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
     }
 
 
-    wifi_hal_dbg_print("%s:%d:bssid:%s frequency:%d ssid:%s\n", __func__, __LINE__,
+    wifi_hal_error_print("%s:%d:bssid:%s frequency:%d ssid:%s\n", __func__, __LINE__,
             to_mac_str(backhaul->bssid, bssid_str), backhaul->freq, backhaul->ssid);
 
     nla_put(msg, NL80211_ATTR_SSID, strlen(backhaul->ssid), backhaul->ssid);
@@ -9027,16 +9029,18 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
     pos = rsn_ie;
 
     bh_rsn = (ieee80211_tlv_t *)get_ie(backhaul->ie, backhaul->ie_len, WLAN_EID_RSN);
+    wpa_hexdump(MSG_MSGDUMP, "backhaul->ie:", backhaul->ie, backhaul->ie_len);
+    wifi_hal_error_print("%s:%d bh_rsn:%d \n", __func__, __LINE__, bh_rsn);
     if (bh_rsn &&
         (wpa_parse_wpa_ie_rsn((const u8 *)bh_rsn, bh_rsn->length + sizeof(ieee80211_tlv_t),
              &data) == 0)) {
         wpa_conf.wpa_group = data.group_cipher;
-        wpa_conf.rsn_pairwise = WPA_CIPHER_CCMP;
+        wpa_conf.rsn_pairwise = data.pairwise_cipher;
         if (data.key_mgmt & WPA_KEY_MGMT_NONE) {
             wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_NONE;
         } else {
             sel = (WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK |
-                WPA_KEY_MGMT_PSK_SHA256 | WPA_KEY_MGMT_IEEE8021X_SHA256 ) & data.key_mgmt;
+                WPA_KEY_MGMT_PSK_SHA256 | WPA_KEY_MGMT_IEEE8021X_SHA256 | WPA_KEY_MGMT_IEEE8021X_SUITE_B_192 ) & data.key_mgmt;
             wifi_hal_error_print("%s:%d AKM suite: 0x%x\n", __func__, __LINE__, data.key_mgmt);
             key_mgmt = pick_akm_suite(sel);
 
@@ -9048,8 +9052,8 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             wpa_conf.wpa_key_mgmt = key_mgmt;
         }
 
-        wifi_hal_dbg_print("%s:%d: %x %x %x\n", __func__, __LINE__, data.group_cipher,
-            data.pairwise_cipher, key_mgmt);
+        wifi_hal_error_print("%s:%d: Group_Cipher:%x Pairwise_Cippher:%x key_mgmt:%x\n", __func__, __LINE__, data.group_cipher,
+            data.pairwise_cipher, data.key_mgmt);
     } else {
         if (security->mode == wifi_security_mode_none) {
             wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_NONE;
@@ -9068,6 +9072,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             } else {
                 wifi_hal_info_print("%s:%d:Invalid encryption mode:%d in wifi_hal_connect\n", __func__, __LINE__, security->encr);
             }
+            wifi_hal_error_print("%s:%d encr:%u rsn_pairwise:%d \n", __func__, __LINE__, security->encr, wpa_conf.rsn_pairwise);
 
             switch (security->mode) {
                 case wifi_security_mode_wpa_personal:
@@ -9085,7 +9090,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_SAE;
                     break;
                 case wifi_security_mode_wpa3_enterprise:
-                    wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_IEEE8021X_SHA256;
+                    wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_IEEE8021X_SHA256 | WPA_KEY_MGMT_IEEE8021X_SUITE_B_192;
                     break;
                 case wifi_security_mode_wpa3_transition:
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_PSK | WPA_KEY_MGMT_SAE;
@@ -9131,7 +9136,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             ver |= NL80211_WPA_VERSION_1;
         nla_put_u32(msg, NL80211_ATTR_WPA_VERSIONS, ver);
 
-        nla_put_u32(msg, NL80211_ATTR_CIPHER_SUITES_PAIRWISE, RSN_CIPHER_SUITE_CCMP);
+        nla_put_u32(msg, NL80211_ATTR_CIPHER_SUITES_PAIRWISE, RSN_CIPHER_SUITE_CCMP | RSN_CIPHER_SUITE_BIP_GMAC_256);
         nla_put_u32(msg, NL80211_ATTR_CIPHER_SUITE_GROUP, RSN_CIPHER_SUITE_CCMP);
 
         if (security->mode == wifi_security_mode_wpa2_enterprise)
@@ -9140,7 +9145,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
             nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X);
 		else if (security->mode == wifi_security_mode_wpa3_enterprise) {
 			wifi_hal_error_print("%s:%d NL80211_ATTR_AKM_SUITES security mode:%d encr:%d\n", __func__, __LINE__, security->mode, security->encr);
-			nla_put_u32(msg, NL80211_ATTR_AKM_SUITES, RSN_AUTH_KEY_MGMT_802_1X_SHA256);
+			nla_put_u32(msg, NL80211_ATTR_AKM_SUITES,  RSN_AUTH_KEY_MGMT_802_1X_SHA256 | RSN_AUTH_KEY_MGMT_802_1X_SUITE_B_192);
 		}
 
         nla_put_u32(msg, NL80211_ATTR_AUTH_TYPE, NL80211_AUTHTYPE_OPEN_SYSTEM);
@@ -9714,6 +9719,10 @@ static void parse_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
                     break;
                 case RSN_AUTH_KEY_MGMT_802_1X_SHA256:
                     wifi_hal_error_print("%s:%d: [SCAN] RSN_AUTH_KEY_MGMT_802_1X_SHA256 sec_mode:%d \n", __func__, __LINE__, bss->sec_mode);
+                    bss->sec_mode = wifi_security_mode_wpa3_enterprise;
+                    break;
+                case RSN_AUTH_KEY_MGMT_802_1X_SUITE_B_192:
+                    wifi_hal_error_print("%s:%d: [SCAN] RSN_AUTH_KEY_MGMT_802_1X_SUITE_B_192 sec_mode:%d \n", __func__, __LINE__, bss->sec_mode);
                     bss->sec_mode = wifi_security_mode_wpa3_enterprise;
                     break;
                 default:
