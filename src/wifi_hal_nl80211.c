@@ -9030,7 +9030,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
 
     bh_rsn = (ieee80211_tlv_t *)get_ie(backhaul->ie, backhaul->ie_len, WLAN_EID_RSN);
     wpa_hexdump(MSG_MSGDUMP, "backhaul->ie:", backhaul->ie, backhaul->ie_len);
-    wifi_hal_error_print("%s:%d bh_rsn:%d \n", __func__, __LINE__, bh_rsn);
+    wifi_hal_error_print("%s:%d bh_rsn:%p \n", __func__, __LINE__, bh_rsn);
     if (bh_rsn &&
         (wpa_parse_wpa_ie_rsn((const u8 *)bh_rsn, bh_rsn->length + sizeof(ieee80211_tlv_t),
              &data) == 0)) {
