@@ -9090,7 +9090,7 @@ int nl80211_connect_sta(wifi_interface_info_t *interface)
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_SAE;
                     break;
                 case wifi_security_mode_wpa3_enterprise:
-                    wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_IEEE8021X_SHA256 | WPA_KEY_MGMT_IEEE8021X_SUITE_B_192;
+                    wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_IEEE8021X_SHA256;
                     break;
                 case wifi_security_mode_wpa3_transition:
                     wpa_conf.wpa_key_mgmt = WPA_KEY_MGMT_PSK | WPA_KEY_MGMT_SAE;
