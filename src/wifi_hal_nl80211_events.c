@@ -1581,6 +1581,64 @@ static void nl80211_vendor_event(wifi_interface_info_t *interface,
 
 static void do_process_drv_event(wifi_interface_info_t *interface, int cmd, struct nlattr **tb)
 {
+    struct nlattr *bss[NL80211_BSS_MAX + 1];
+    static struct nla_policy bss_policy[NL80211_BSS_MAX + 1] = {
+        [NL80211_BSS_BSSID] = { .type = NLA_UNSPEC },
+        [NL80211_BSS_FREQUENCY] = { .type = NLA_U32 },
+        [NL80211_BSS_TSF] = { .type = NLA_U64 },
+        [NL80211_BSS_BEACON_INTERVAL] = { .type = NLA_U16 },
+        [NL80211_BSS_CAPABILITY] = { .type = NLA_U16 },
+        [NL80211_BSS_INFORMATION_ELEMENTS] = { .type = NLA_UNSPEC },
+        [NL80211_BSS_SIGNAL_MBM] = { .type = NLA_U32 },
+        [NL80211_BSS_SIGNAL_UNSPEC] = { .type = NLA_U8 },
+        [NL80211_BSS_STATUS] = { .type = NLA_U32 },
+        [NL80211_BSS_SEEN_MS_AGO] = { .type = NLA_U32 },
+        [NL80211_BSS_BEACON_IES] = { .type = NLA_UNSPEC },
+        [NL80211_BSS_PARENT_TSF] = { .type = NLA_U64 },
+        [NL80211_BSS_PARENT_BSSID] = { .type = NLA_UNSPEC },
+        [NL80211_BSS_LAST_SEEN_BOOTTIME] = { .type = NLA_U64 },
+#ifndef NO_NL80211_BSS_NOISE
+        [NL80211_BSS_NOISE] = { .type = NLA_U8 },
+#endif
+    };
+    uint8_t *ie = NULL;
+    signed int len = 0;
+    mac_address_t   bssid;
+    mac_addr_str_t  bssid_str = {0};
+    struct nlattr *frame;
+
+    wifi_hal_error_print("%s:%d: nl80211: index:%u cmd:%d \n", __func__, __LINE__, interface->index, cmd);
+    if(frame = tb[NL80211_ATTR_FRAME] != NULL) {
+        const struct ieee80211_hdr *hdr;
+        hdr = (const struct ieee80211_hdr *)nla_data(frame);
+        u16 fc; struct ieee80211_hdr *hdr;
+        fc = le_to_host16(hdr->frame_control);
+        wifi_hal_error_print("%s:%d: nl80211: index:%u cmd:%d fc_type:%d fc_stype:%d \n",
+            __func__, __LINE__, interface->index, cmd, WLAN_FC_GET_TYPE(fc), WLAN_FC_GET_STYPE(fc));
+    }
+
+    if (nla_parse_nested(bss, NL80211_BSS_MAX, tb[NL80211_ATTR_BSS], bss_policy) != 0) {
+        wifi_hal_stats_error_print("%s:%d: [SCAN] nested bss attribute not present\n", __func__, __LINE__);
+        return NL_SKIP;
+    }
+
+    if (bss[NL80211_BSS_BSSID] != NULL) {
+        memcpy(bssid, nla_data(bss[NL80211_BSS_BSSID]), sizeof(mac_address_t));
+        key = to_mac_str(bssid, bssid_str);
+    }
+
+    if (bss[NL80211_BSS_INFORMATION_ELEMENTS]) {
+        ie = nla_data(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+        len = nla_len(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+        wifi_hal_error_print("%s:%d len:%d \n", __func__, __LINE__, len);
+        wpa_hexdump(MSG_MSGDUMP, "BSS_IE:", ie, len);
+        //wifi_hal_stats_dbg_print("[SCAN] BSSID: %s, IE LEN %d\n", bssid_str, len);
+        if (len > 512) {
+            wifi_hal_stats_error_print("[Wrong NL SCAN output] BSSID: %s, IE LEN %d\n", bssid_str, len);
+            return NL_SKIP;
+        }
+    }
+
     switch (cmd) {
 #if defined(_PLATFORM_RASPBERRYPI_) || defined(_PLATFORM_BANANAPI_R4_) 
     case NL80211_CMD_NEW_STATION:
