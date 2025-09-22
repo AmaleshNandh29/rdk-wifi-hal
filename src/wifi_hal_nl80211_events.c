@@ -1620,7 +1620,7 @@ static void do_process_drv_event(wifi_interface_info_t *interface, int cmd, stru
 
         if (bss[NL80211_BSS_BSSID] != NULL) {
             memcpy(bssid, nla_data(bss[NL80211_BSS_BSSID]), sizeof(mac_address_t));
-            char *key = to_mac_str(bssid, bssid_str);
+            to_mac_str(bssid, bssid_str);
         }
 
         if (bss[NL80211_BSS_INFORMATION_ELEMENTS]) {
